@@ -512,16 +512,16 @@ withGoldTotal$Country[[maxIndex]]</code></pre>
     filter(Gold_1 &gt; 0) %&gt;% 
     filter(Country != &quot;Totals&quot;)
 maxIndex &lt;- which.max(percDifference$DifferSummerToWinterPerc)
-withGoldTotal$Country[[maxIndex]]</code></pre>
-<pre><code>## [1] &quot;Australasia&quot;</code></pre>
+percDifference$Country[[maxIndex]]</code></pre>
+<pre><code>## [1] &quot;Bulgaria&quot;</code></pre>
 <p>Yes I know that the abs part is not in the formula. But it is necessary, because it could be, that a country has more winter gold medals than summer.</p>
 </div>
 <div id="question-4" class="section level3">
 <h3>Question 4</h3>
 <p>Write a function that creates a Series called “Points” which is a weighted value where each gold medal (<code>Gold.2</code>) counts for 3 points, silver medals (<code>Silver.2</code>) for 2 points, and bronze medals (<code>Bronze.2</code>) for 1 point.</p>
 <p><em>Script should return a data frame of length 146 with 2 columns named “Country and”Points&quot;</em></p>
-<pre class="r"><code>olympics %&gt;% mutate(Points = Gold_2*3+Silver_2*2+Bronze_2) %&gt;% select(Country, Points)</code></pre>
-<pre><code>## # A tibble: 147 x 2
+<pre class="r"><code>olympics %&gt;% filter(Country != &quot;Totals&quot;) %&gt;% mutate(Points = Gold_2*3+Silver_2*2+Bronze_2) %&gt;% select(Country, Points)</code></pre>
+<pre><code>## # A tibble: 146 x 2
 ##    Country     Points
 ##    &lt;chr&gt;        &lt;dbl&gt;
 ##  1 Afghanistan      2
@@ -534,7 +534,7 @@ withGoldTotal$Country[[maxIndex]]</code></pre>
 ##  8 Azerbaijan      43
 ##  9 Bahamas         24
 ## 10 Bahrain          1
-## # ... with 137 more rows</code></pre>
+## # ... with 136 more rows</code></pre>
 </div>
 </div>
 <div id="part-2" class="section level2">
@@ -581,11 +581,15 @@ maxAbsoluteChange$MaxAbsoluteChangeBetween2010And2015 &lt;- censusData %&gt;%
     filter(SUMLEV == &quot;050&quot;) %&gt;%
     select(POPESTIMATE2010, POPESTIMATE2011, POPESTIMATE2012, POPESTIMATE2013, POPESTIMATE2014, POPESTIMATE2015) %&gt;%
     apply(1, function(oneRow) {
-        max(oneRow[&quot;POPESTIMATE2010&quot;], oneRow[&quot;POPESTIMATE2011&quot;], oneRow[&quot;POPESTIMATE2012&quot;], oneRow[&quot;POPESTIMATE2013&quot;], oneRow[&quot;POPESTIMATE2014&quot;], oneRow[&quot;POPESTIMATE2015&quot;])
+        max(abs(oneRow[&quot;POPESTIMATE2010&quot;]-oneRow[&quot;POPESTIMATE2011&quot;]), 
+            abs(oneRow[&quot;POPESTIMATE2011&quot;]-oneRow[&quot;POPESTIMATE2012&quot;]),
+            abs(oneRow[&quot;POPESTIMATE2012&quot;]-oneRow[&quot;POPESTIMATE2013&quot;]),
+            abs(oneRow[&quot;POPESTIMATE2013&quot;]-oneRow[&quot;POPESTIMATE2014&quot;]), 
+            abs(oneRow[&quot;POPESTIMATE2014&quot;]-oneRow[&quot;POPESTIMATE2015&quot;]))
     })
 maxIndex &lt;- which.max(maxAbsoluteChange$MaxAbsoluteChangeBetween2010And2015)
-maxAbsoluteChange$STNAME[[maxIndex]]</code></pre>
-<pre><code>## [1] &quot;California&quot;</code></pre>
+maxAbsoluteChange$CTYNAME[[maxIndex]]</code></pre>
+<pre><code>## [1] &quot;Harris County&quot;</code></pre>
 </div>
 <div id="question-8" class="section level3">
 <h3>Question 8</h3>

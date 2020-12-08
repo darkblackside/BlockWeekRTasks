@@ -122,7 +122,7 @@ percDifference <- olympics %>% mutate(DifferSummerToWinterPerc = abs(Gold - Gold
     filter(Gold_1 > 0) %>% 
     filter(Country != "Totals")
 maxIndex <- which.max(percDifference$DifferSummerToWinterPerc)
-withGoldTotal$Country[[maxIndex]]
+percDifference$Country[[maxIndex]]
 ```
 Yes I know that the abs part is not in the formula. But it is necessary, because it could be, that a country has more winter gold medals than summer.
 
@@ -133,7 +133,7 @@ Write a function that creates a Series called "Points" which is a weighted value
 *Script should return a data frame of length 146 with 2 columns named "Country and "Points"*
 
 ```{r}
-olympics %>% mutate(Points = Gold_2*3+Silver_2*2+Bronze_2) %>% select(Country, Points)
+olympics %>% filter(Country != "Totals") %>% mutate(Points = Gold_2*3+Silver_2*2+Bronze_2) %>% select(Country, Points)
 ```
 
 ## Part 2
@@ -192,10 +192,14 @@ maxAbsoluteChange$MaxAbsoluteChangeBetween2010And2015 <- censusData %>%
     filter(SUMLEV == "050") %>%
     select(POPESTIMATE2010, POPESTIMATE2011, POPESTIMATE2012, POPESTIMATE2013, POPESTIMATE2014, POPESTIMATE2015) %>%
     apply(1, function(oneRow) {
-        max(oneRow["POPESTIMATE2010"], oneRow["POPESTIMATE2011"], oneRow["POPESTIMATE2012"], oneRow["POPESTIMATE2013"], oneRow["POPESTIMATE2014"], oneRow["POPESTIMATE2015"])
+        max(abs(oneRow["POPESTIMATE2010"]-oneRow["POPESTIMATE2011"]), 
+            abs(oneRow["POPESTIMATE2011"]-oneRow["POPESTIMATE2012"]),
+            abs(oneRow["POPESTIMATE2012"]-oneRow["POPESTIMATE2013"]),
+            abs(oneRow["POPESTIMATE2013"]-oneRow["POPESTIMATE2014"]), 
+            abs(oneRow["POPESTIMATE2014"]-oneRow["POPESTIMATE2015"]))
     })
 maxIndex <- which.max(maxAbsoluteChange$MaxAbsoluteChangeBetween2010And2015)
-maxAbsoluteChange$STNAME[[maxIndex]]
+maxAbsoluteChange$CTYNAME[[maxIndex]]
 ```
 
 ### Question 8
