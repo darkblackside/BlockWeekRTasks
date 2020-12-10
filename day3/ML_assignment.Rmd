@@ -168,7 +168,7 @@ registerDoParallel(cluster)
 
 library(kernlab)
 control <- trainControl(method = "cv", number = 10, p = .9, allowParallel = TRUE)
-svm_Linear <- train(expectedClass ~., data = extendedFilteringTraining %>% select(-classe), method = "svmPoly",
+svm_Linear <- train(expectedClass ~., data = extendedFilteringTraining %>% select(-classe), method = "svmLinear",
                  trControl=control,
                  preProcess = c("center", "scale"),
                  tuneLength = 4)
@@ -193,11 +193,11 @@ write.csv(result, "../data/predictedThroughSvmLinear.csv")
 
 Accuracy per run in cross-validation:
 ```{R}
-plot(1:10, train_rpartExtended.results.Accuracy)
+plot(1:10, train_rpartExtended$results$Accuracy)
 ```
 ```{R}
-plot(1:10, train_randomForest.results.Accuracy)
+plot(1:3, train_randomForest$results$Accuracy)
 ```
 ```{R}
-plot(1:10, svm_Linear.results.Accuracy)
+plot(1, svm_Linear$results$Accuracy)
 ```
