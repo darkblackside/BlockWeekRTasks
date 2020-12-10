@@ -102,10 +102,15 @@ Another tree:
 control <- trainControl(method = "cv", number = 10, p = .9)
 #train(filteredTrainingWithoutNa, filteredTrainingWithoutNa$expectedClass, method='LMT', iter='1')
 
-train_rpartExtended <- train(expectedClass ~ ., data = extendedFilteringTraining %>% select(-classe), 
+forRandomForest <- extendedFilteringTraining %>% select(-classe)
+filterForRandomForestIdx <- createDataPartition(forRandomForest$accel_belt_z, p=0.8, list = FALSE)
+trainingForRandomForest <- forRandomForest[filterForRandomForestIdx ,]
+validationForRandomForest  <- extendedFilteringTraining[-filterForRandomForestIdx ,]
+
+train_rpartExtended <- train(expectedClass ~ ., data = trainingForRandomForest, 
                      method = "rpart",
                      trControl = control,
-                     tuneLength = 10)
+                     tuneLength = 50)
 ggplot(train_rpartExtended, highlight = TRUE)
 ```
 ```{r}
@@ -115,9 +120,9 @@ fancyRpartPlot(train_rpartExtended$finalModel, uniform=TRUE,cex=0.5)
 
 Calculate accuracy:
 ```{R}
-training$prediction <- predict(train_rpartExtended, extendedFilteringTraining)
-result <- training %>% select(classe, prediction)
-nrow(result %>% filter(classe == prediction))/nrow(training)
+validationForRandomForest$prediction <- predict(train_rpartExtended, validationForRandomForest)
+result <- validationForRandomForest %>% select(classe, prediction)
+nrow(result %>% filter(classe == prediction))/nrow(result)
 ```
 
 Prediction:
