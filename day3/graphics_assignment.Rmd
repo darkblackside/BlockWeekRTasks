@@ -1,0 +1,136 @@
+---
+title: "Getting and Cleaning Data assignment"
+author: "Oleksii Yehorchenkov"
+date: "30 11 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+This assignment is based on materials from Coursera course [Exploratory Data Analysis](https://www.coursera.org/learn/exploratory-data-analysis/home/welcome)
+
+## Introduction
+
+Fine particulate matter (PM2.5) is an ambient air pollutant for which there is strong evidence that it is harmful to human health. In the United States, the Environmental Protection Agency (EPA) is tasked with setting national ambient air quality standards for fine PM and for tracking the emissions of this pollutant into the atmosphere. Approximatly every 3 years, the EPA releases its database on emissions of PM2.5. This database is known as the National Emissions Inventory (NEI). You can read more information about the NEI at the EPA National Emissions Inventory web site.
+
+For each year and for each type of PM source, the NEI records how many tons of PM2.5 were emitted from that source over the course of the entire year. The data that you will use for this assignment are for 1999, 2002, 2005, and 2008.
+
+## Data
+
+The data for this assignment could be downloaded by the [link](https://www.dropbox.com/s/fey54ngk8g4z6rr/exdata_data_NEI_data.zip?dl=0):
+
+The zip file contains two files:
+
+**PM2.5 Emissions Data** (`summarySCC_PM25.rds`): This file contains a data frame with all of the PM2.5 emissions data for 1999, 2002, 2005, and 2008. For each year, the table contains number of tons of PM2.5 emitted from a specific type of source for the entire year.
+
+- **fips**: A five-digit number (represented as a string) indicating the U.S. county
+- **SCC**: The name of the source as indicated by a digit string (see source code classification table)
+- **Pollutant**: A string indicating the pollutant
+- **Emissions**: Amount of PM2.5 emitted, in tons
+- **type**: The type of source (point, non-point, on-road, or non-road)
+- **year**: The year of emissions recorded
+
+**Source Classification Code Table** (`Source_Classification_Code.rds`): This table provides a mapping from the SCC digit strings in the Emissions table to the actual name of the PM2.5 source. The sources are categorized in a few different ways from more general to more specific and you may choose to explore whatever categories you think are most useful. For example, source “10100101” is known as “Ext Comb /Electric Gen /Anthracite Coal /Pulverized Coal”.
+
+You can read each of the two files using the `readRDS()` function in R. For example, reading in each file can be done with the following code:
+
+```{r}
+NEI <- readRDS("../data/summarySCC_PM25.rds")
+SCC <- readRDS("../data/Source_Classification_Code.rds")
+```
+## Questions
+
+You must address the following questions and tasks in your exploratory analysis. For each question/task you will need to make a single **bar** plot. You can use any plotting system in R to make your plot.
+
+1. Have total emissions from PM2.5 decreased in the United States from 1999 to 2008? Make a plot showing the **total** PM2.5 emission from all sources for each of the years 1999, 2002, 2005, and 2008.
+2. Have total emissions from PM2.5 decreased in the **Baltimore City**, Maryland (`fips == "24510"`) from 1999 to 2008?
+3. Of the four types of sources indicated by the `type` (point, nonpoint, onroad, nonroad) variable, which of these four sources have seen decreases in emissions from 1999–2008 for **Baltimore City**? Which have seen increases in emissions from 1999–2008?
+4. Across the United States, how have emissions from coal combustion-related sources changed from 1999–2008?
+5. How have emissions from motor vehicle sources changed from 1999–2008 in **Baltimore City** (EI.Sector starts from "Mobile")?
+6. Compare emissions from motor vehicle sources in Baltimore City with emissions from motor vehicle sources in **Los Angeles County**, California (`fips == "06037"`). Which city has seen greater changes over time in motor vehicle emissions?
+
+1. Have total emissions (NEI) from PM2.5 decreased in the United States from 1999 to 2008? Make a plot showing the **total** PM2.5 emission from all sources for each of the years 1999, 2002, 2005, and 2008.
+```{r}
+library(ggplot2)
+library(dplyr)
+total <- merge(NEI,SCC,by="SCC")
+
+grouped <- NEI %>% group_by(year) %>% summarise(pollution = sum(Emissions))
+grouped %>% ggplot(aes(x = factor(year), y = pollution)) + geom_bar(stat = "identity") + xlab("Year") + ylab("Total pollution") + ggtitle("Pollution in the US from 1999 to 2008")
+```
+
+2. Have total emissions from PM2.5 decreased in the **Baltimore City**, Maryland (`fips == "24510"`) from 1999 to 2008?
+```{r}
+groupedAndBaltimore <- NEI %>% filter(fips == "24510") %>% group_by(year) %>% summarise(pollution = sum(Emissions))
+groupedAndBaltimore %>% ggplot(aes(x = factor(year), y = pollution)) + geom_bar(stat = "identity") + xlab("Year") + ylab("Total pollution") + ggtitle("Pollution in Baltimore City, Maryland from 1999 to 2008")
+```
+Yes they have, in total.
+
+3. Of the four types of sources indicated by the `type` (point, nonpoint, onroad, nonroad) variable, which of these four sources have seen decreases in emissions from 1999–2008 for **Baltimore City**? Which have seen increases in emissions from 1999–2008?
+```{r}
+groupedForBySource <- NEI %>% 
+    filter(fips == "24510") %>% 
+    filter(type == "POINT" | type == "NONPOINT" | type == "ON-ROAD" | type == "NON-ROAD") %>% 
+    group_by(year, type) %>% 
+    summarise(pollution = sum(Emissions))
+groupedForBySource %>% ggplot(aes(x = factor(year), y = pollution, fill=type)) + geom_bar(stat = "identity", position=position_dodge()) + theme_minimal() + xlab("Year") + ylab("Total pollution") + ggtitle("Pollution in Baltimore City, Maryland from 1999 to 2008 by vehicles")
+```
+None have seen increases in total (Nonroad between 1999 and 2002, point between 1999 and 2005, nonpoint and onroad between 2002 and 2005 probably)
+
+4. Across the United States, how have emissions from coal combustion-related sources changed from 1999–2008?
+```{r}
+library(sjmisc)
+groupedByCoalCombustion <- total %>% 
+    filter(SCC.Level.One == "External Combustion Boilers" | SCC.Level.One == "Internal Combustion Engines") %>%
+    filter(str_contains(Short.Name, "Coal", ignore.case = TRUE)) %>%
+    group_by(year) %>% 
+    summarise(pollution = sum(Emissions))
+groupedByCoalCombustion %>% ggplot(aes(x = factor(year), y = pollution)) + geom_bar(stat = "identity", position=position_dodge()) + xlab("Year") + ylab("Pollution") + ggtitle("Pollution US from 1999 to 2008 by combustion engines that burn coal")
+```
+
+5. How have emissions from motor vehicle sources changed from 1999–2008 in **Baltimore City** (EI.Sector starts from "Mobile")?
+```{r}
+library(gdata)
+groupedByVehicleSources <- total %>% 
+    filter(fips == "24510") %>% 
+    filter(startsWith(as.character(EI.Sector), "Mobile"), ignore.case=TRUE) %>%
+    group_by(year) %>% 
+    summarise(pollution = sum(Emissions))
+groupedByVehicleSources %>% ggplot(aes(x = factor(year), y = pollution)) + geom_bar(stat = "identity", position=position_dodge()) + xlab("Year") + ylab("Vehicle pollution") + ggtitle("Pollution in Baltimore City, Maryland from 1999 to 2008 by vehicles")
+```
+
+6. Compare emissions from motor vehicle sources in Baltimore City with emissions from motor vehicle sources in **Los Angeles County**, California (`fips == "06037"`). Which city has seen greater changes over time in motor vehicle emissions?
+```{r}
+groupedByCities <- total %>% 
+    filter(fips == "24510" | fips == "06037") %>% 
+    filter(startsWith(as.character(EI.Sector), "Mobile"), ignore.case=TRUE) %>%
+    mutate(county = ifelse(fips=="24510", "Baltimore City, Maryland", "Los Angeles County, California")) %>% 
+    group_by(year, county) %>% 
+    summarise(pollution = sum(Emissions))
+groupedByCities %>% ggplot(aes(x = factor(year), y = pollution, fill=county)) + geom_bar(stat = "identity", position=position_dodge()) + xlab("Year") + ylab("Vehicle pollution") + ggtitle("Pollution in Baltimore City, Maryland (24510) and \n Los Angeles County, California from 1999 to 2008 by transportation")
+```
+Greater changes: Los Angeles! But, this are absolute values. To get a good comparability you should compare each year with the previous one.
+```{r}
+library(tidyr)
+pivoted <- groupedByCities %>% spread(year, pollution)
+maxPerCity <- groupedByCities %>% group_by(county) %>% summarise(max = max(pollution))
+pivotedChanged <- pivoted %>% 
+    mutate(mean = rowMeans(pivoted %>% select("1999", "2002", "2005", "2008"))) %>% 
+    mutate(changeYear1 = abs(pivoted$"1999"-pivoted$"2002")) %>%
+    mutate(changeYear2 = abs(pivoted$"2002"-pivoted$"2005")) %>%
+    mutate(changeYear3 = abs(pivoted$"2005"-pivoted$"2008"))
+
+pivotedChanged$maxChange <- pivotedChanged %>% apply(1, function(oneRow) {
+    max(c(oneRow["changeYear1"],oneRow["changeYear2"],oneRow["changeYear3"]))
+})
+
+merged <- pivotedChanged %>% 
+    merge(maxPerCity,by="county") %>% 
+    mutate(percChange = as.numeric(maxChange)/as.numeric(max)*100)
+
+merged %>% select(county, mean, max, percChange)
+```
+You see the percentual max change between the years is much higher in Baltimore City, Maryland
+
