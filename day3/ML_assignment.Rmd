@@ -1,0 +1,203 @@
+---
+title: "Machine learning assignment"
+author: "Oleksii Yehorchenkov"
+date: "30 11 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+This assignment is based on materials from Coursera course [Practical machine learning](https://www.coursera.org/learn/practical-machine-learning/home/welcome)
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+## Data
+
+The training data for this project are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment. 
+
+## What you should do
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+Also you should explain how do you deal with NA's values and investigate correlation.
+
+You repository for this assignment should consist of R markdown file, compiled html file and prediction.csv file with data from pml-testing.csv and 'classe' column with predictions for 20 observation.
+
+```{R}
+library(caret)
+library(dplyr)
+testingOriginal <- read.csv("../data/pml-testing.csv")
+testing <- testingOriginal %>% select(-X)
+training <- read.csv("../data/pml-training.csv") %>% select(-X)
+```
+
+Check if all columns are named the same:
+```{R}
+if (!all(colnames(testing[,1:ncol(testing)-1]) == colnames(training[,1:ncol(training)-1]))) {
+    raise
+}
+```
+
+Filter out zero variance columns (first in training, then in testing to have the correct variables afterwards):
+```{R}
+nearZeroVarianceIndices <- nearZeroVar(training)
+filteredTraining <- training[, -nearZeroVarianceIndices]
+filteredTesting <- testing[, -nearZeroVarianceIndices]
+```
+
+Get columns where NA exists (maybe these are enough for a decision tree). This is to find a common ground for all devices (every device is able to give these features).
+```{R}
+numsNoNa <- unlist(sapply(filteredTraining, function(column) {
+    all(!is.na(column))    
+}))
+filteredTrainingWithoutNa <- filteredTraining[, numsNoNa]
+filteredTestingWithoutNa <- filteredTesting[, numsNoNa]
+```
+
+Maybe filter out columns with high correlation to other features, but we don't need this if we're using decision trees/random forests because there is a high probability that will filter out the correlated features on their own.
+
+Add prediction value again, if it was lost in the column filtering somewhere
+```{R}
+filteredTrainingWithoutNa$expectedClass <- training$classe
+filteredTestingWithoutNa$expectedClass <- testing$problem_id
+```
+
+Build up the decision tree
+```{R}
+control <- trainControl(method = "cv", number = 10, p = .9)
+#train(filteredTrainingWithoutNa, filteredTrainingWithoutNa$expectedClass, method='LMT', iter='1')
+
+train_rpart <- train(expectedClass ~ ., data = filteredTrainingWithoutNa %>% select(-classe), 
+                     method = "rpart",
+                     trControl = control,
+                     tuneLength = 10)
+ggplot(train_rpart, highlight = TRUE)
+```
+
+```{r}
+library(rattle)
+fancyRpartPlot(train_rpart$finalModel, uniform=TRUE,cex=0.5)
+```
+
+Filter out: user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, num_window because they are likely to be irrelevant
+```{r}
+extendedFilteringTraining <- filteredTrainingWithoutNa %>% select(-user_name, -raw_timestamp_part_1, -raw_timestamp_part_2, -cvtd_timestamp, -num_window)
+extendedFilteringTesting <- filteredTestingWithoutNa %>% select(-user_name, -raw_timestamp_part_1, -raw_timestamp_part_2, -cvtd_timestamp, -num_window)
+```
+
+Another tree:
+```{R}
+control <- trainControl(method = "cv", number = 10, p = .9)
+#train(filteredTrainingWithoutNa, filteredTrainingWithoutNa$expectedClass, method='LMT', iter='1')
+
+train_rpartExtended <- train(expectedClass ~ ., data = extendedFilteringTraining %>% select(-classe), 
+                     method = "rpart",
+                     trControl = control,
+                     tuneLength = 10)
+ggplot(train_rpartExtended, highlight = TRUE)
+```
+```{r}
+library(rattle)
+fancyRpartPlot(train_rpartExtended$finalModel, uniform=TRUE,cex=0.5)
+```
+
+Calculate accuracy:
+```{R}
+training$prediction <- predict(train_rpartExtended, extendedFilteringTraining)
+result <- training %>% select(classe, prediction)
+nrow(result %>% filter(classe == prediction))/nrow(training)
+```
+
+Prediction:
+```{R}
+testingOriginal$prediction <- predict(train_rpartExtended, extendedFilteringTesting)
+result <- testingOriginal %>% select(X, prediction)
+write.csv(result, "../data/predictedThroughRpart.csv")
+```
+
+Prediction with Random forest:
+```{R}
+library(parallel)
+library(doParallel)
+cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+registerDoParallel(cluster)
+
+control <- trainControl(method = "cv", number = 10, p = .9, allowParallel = TRUE)
+
+train_randomForest <- train(expectedClass ~ ., data = extendedFilteringTraining %>% select(-classe), 
+                     method = "rf",
+                     trControl = control,
+                     tuneGrid = NULL)
+stopCluster(cluster)
+registerDoSEQ()
+ggplot(train_rpartExtended, highlight = TRUE)
+```
+Calculate accuracy:
+
+```{R}
+training$prediction <- predict(train_randomForest, extendedFilteringTraining)
+result <- training %>% select(classe, prediction)
+nrow(result %>% filter(classe == prediction))/nrow(training)
+```
+
+Prediction:
+```{R}
+testingOriginal$prediction <- predict(train_randomForest, extendedFilteringTesting)
+result <- testingOriginal %>% select(X, prediction)
+write.csv(result, "../data/predictedThroughRandomForest.csv")
+```
+
+Prediction with SVM:
+```{R}
+library(parallel)
+library(doParallel)
+cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+registerDoParallel(cluster)
+
+library(kernlab)
+control <- trainControl(method = "cv", number = 10, p = .9, allowParallel = TRUE)
+svm_Linear <- train(expectedClass ~., data = extendedFilteringTraining %>% select(-classe), method = "svmPoly",
+                 trControl=control,
+                 preProcess = c("center", "scale"),
+                 tuneLength = 4)
+
+stopCluster(cluster)
+registerDoSEQ()
+```
+Calculate accuracy:
+
+```{R}
+training$prediction <- predict(svm_Linear, extendedFilteringTraining)
+result <- training %>% select(classe, prediction)
+nrow(result %>% filter(classe == prediction))/nrow(training)
+```
+
+Prediction:
+```{R}
+testingOriginal$prediction <- predict(svm_Linear, extendedFilteringTesting)
+result <- testingOriginal %>% select(X, prediction)
+write.csv(result, "../data/predictedThroughSvmLinear.csv")
+```
+
+Accuracy per run in cross-validation:
+```{R}
+plot(1:10, train_rpartExtended.results.Accuracy)
+```
+```{R}
+plot(1:10, train_randomForest.results.Accuracy)
+```
+```{R}
+plot(1:10, svm_Linear.results.Accuracy)
+```
